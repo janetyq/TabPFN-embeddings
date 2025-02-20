@@ -7,103 +7,128 @@
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 </head>
 <body>
-    <h1>TabPFN-v2 t-SNE dataset embeddings</h1> <!-- Debugging text -->
+    <h1>TabPFN-v2 t-SNE dataset embeddings</h1>
     <div>
         <label for="pointSlider">Number of Points:</label>
         <input type="range" id="pointSlider" min="100" max="5000" value="500" step="100">
         <span id="pointCount">500</span>
+        <p></p>
     </div>
     <div id="controls"></div>
+    <div>
+        <p></p>
+        <input type="checkbox" id="toggleAll" checked>
+        <label for="toggleAll">Check/Uncheck All</label>
+    </div>
     <div id="plot"></div>
 
     <script>
         async function loadData() {
-            const response = await fetch('embeddings_tsne.json'); // Ensure this file is correctly generated
+            const response = await fetch('embeddings_tsne.json');
             const data = await response.json();
-            console.log("Unique Labels:", [...new Set(data.map(point => point.label))]); // Debugging print
+            console.log("Unique Labels:", [...new Set(data.map(point => point.label))]);
             return data;
         }
 
         let traces = {};
         let allData = [];
+        let updatePending = false;
         const engineeringLabels = new Set(["Euler", "GearTrain", "PressureVessel", "WeldedBeam", "ReinforcedConcreteBeam", "Truss10D", "Truss25D"]);
-
 
         function plotData(data) {
             allData = data;
             updatePlotWithLimit();
-            initializeCheckboxes(); // Ensure checkboxes are set up once
+            setTimeout(initializeCheckboxes, 100);
         }
 
         function updatePlotWithLimit() {
-            let limit = parseInt(document.getElementById('pointSlider').value);
-            document.getElementById('pointCount').textContent = limit;
-
-            // Preserve visibility states
-            let visibilityStates = {};
-            Object.keys(traces).forEach(label => {
-                visibilityStates[label] = traces[label].visible;
+            if (updatePending) return;
+            updatePending = true;
+            requestAnimationFrame(() => {
+                let limit = parseInt(document.getElementById('pointSlider').value);
+                document.getElementById('pointCount').textContent = limit;
+                
+                let visibilityStates = {};
+                Object.keys(traces).forEach(label => {
+                    visibilityStates[label] = traces[label].visible;
+                });
+                
+                traces = {};
+                allData.forEach(point => {
+                    if (!(point.label in traces)) {
+                        traces[point.label] = {
+                            x: [],
+                            y: [],
+                            mode: 'markers',
+                            type: 'scattergl',
+                            name: point.label,
+                            marker: { size: 6 },
+                            visible: visibilityStates[point.label] ?? engineeringLabels.has(point.label)
+                        };
+                    }
+                    if (traces[point.label].x.length < limit) {
+                        traces[point.label].x.push(point.x);
+                        traces[point.label].y.push(point.y);
+                    }
+                });
+                
+                let plotData = Object.values(traces);
+                Plotly.react('plot', plotData);
+                updatePending = false;
             });
-
-            traces = {};
-            allData.forEach(point => {
-                if (!(point.label in traces)) {
-                    traces[point.label] = {
-                        x: [],
-                        y: [],
-                        mode: 'markers',
-                        type: 'scatter',
-                        name: point.label,
-                        marker: { size: 6 },
-                        visible: visibilityStates[point.label] ?? engineeringLabels.has(point.label) // Restore visibility
-                    };
-                }
-                if (traces[point.label].x.length < limit) {
-                    traces[point.label].x.push(point.x);
-                    traces[point.label].y.push(point.y);
-                }
-            });
-
-            let plotData = Object.values(traces);
-            Plotly.react('plot', plotData); // Use react instead of newPlot to retain layout/state
         }
 
         function initializeCheckboxes() {
             const controls = document.getElementById('controls');
             controls.innerHTML = '';
-
+            
             Object.keys(traces).forEach(label => {
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
                 checkbox.checked = traces[label].visible === true;
                 checkbox.dataset.label = label;
+                checkbox.classList.add('labelCheckbox');
                 checkbox.addEventListener('change', updateVisibility);
-
+                
                 const labelElem = document.createElement('label');
-                if (engineeringLabels.has(label)) {
-                    labelElem.innerHTML = `<strong>${label}</strong>`; // Bold for engineering problems
-                } else {
-                    labelElem.textContent = label;
-                }
-
+                labelElem.innerHTML = engineeringLabels.has(label) ? `<strong>${label}</strong>` : label;
+                
                 controls.appendChild(checkbox);
                 controls.appendChild(labelElem);
                 controls.appendChild(document.createElement('br'));
             });
+
+            document.getElementById('toggleAll').addEventListener('change', toggleAllCheckboxes);
         }
 
         function updateVisibility() {
             const checkboxes = document.querySelectorAll('#controls input[type=checkbox]');
+            const updateIndices = [];
+            const updateValues = [];
+
             checkboxes.forEach(cb => {
                 const label = cb.dataset.label;
-                const visible = cb.checked ? true : 'legendonly';
-                Plotly.restyle('plot', { visible: visible }, Object.keys(traces).indexOf(label));
-                traces[label].visible = visible; // Maintain visibility state
+                if (traces[label]) {
+                    updateIndices.push(Object.keys(traces).indexOf(label));
+                    updateValues.push(cb.checked ? true : 'legendonly');
+                    traces[label].visible = cb.checked ? true : 'legendonly';
+                }
             });
+            
+            if (updateIndices.length) {
+                Plotly.restyle('plot', { visible: updateValues }, updateIndices);
+            }
+        }
+
+        function toggleAllCheckboxes(event) {
+            const checkboxes = document.querySelectorAll('.labelCheckbox');
+            checkboxes.forEach(cb => {
+                cb.checked = event.target.checked;
+            });
+            updateVisibility();
         }
 
         document.getElementById('pointSlider').addEventListener('input', updatePlotWithLimit);
-
         loadData().then(plotData);
     </script>
 </body>
