@@ -5,22 +5,43 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>t-SNE Embeddings</title>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        .container {
+            display: flex;
+        }
+        .controls-section {
+            width: 15%;
+            padding: 10px;
+        }
+        .plot-section {
+            width: 85%;
+        }
+        #plot {
+            height: 600px;
+        }
+    </style>
 </head>
 <body>
     <h1>TabPFN-v2 t-SNE dataset embeddings</h1>
-    <div>
-        <label for="pointSlider">Number of Points:</label>
-        <input type="range" id="pointSlider" min="100" max="5000" value="500" step="100">
-        <span id="pointCount">500</span>
-        <p></p>
+    <div class="container">
+        <div class="controls-section">
+            <div>
+                <label for="pointSlider">Number of Points:</label>
+                <input type="range" id="pointSlider" min="100" max="5000" value="500" step="100">
+                <span id="pointCount">500</span>
+                <p></p>
+            </div>
+            <div id="controls"></div>
+            <div>
+                <p></p>
+                <input type="checkbox" id="toggleAll" checked>
+                <label for="toggleAll">Check/Uncheck All</label>
+            </div>
+        </div>
+        <div class="plot-section">
+            <div id="plot"></div>
+        </div>
     </div>
-    <div id="controls"></div>
-    <div>
-        <p></p>
-        <input type="checkbox" id="toggleAll" checked>
-        <label for="toggleAll">Check/Uncheck All</label>
-    </div>
-    <div id="plot"></div>
 
     <script>
         async function loadData() {
